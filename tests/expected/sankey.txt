@@ -1,0 +1,21 @@
+Sankey diagram
+
+  Agricultural waste  → Bio-conversion    ███████                   124.729
+  Bio-conversion      → Liquid                                      0.597
+                      → Losses            ██                        26.862
+                      → Solid             █████████████████         280.322
+                      → Gas               █████                     81.144
+  Solid               → District heating                            0.129
+  Coal                → Solid             ████████████████████████  400
+  Coal reserves       → Coal              █                         11.606
+  
+  Totals (out / in)
+    Agricultural waste  out 124.729  in 0
+    Bio-conversion      out 388.925  in 124.729
+    Liquid              out 0  in 0.597
+    Losses              out 0  in 26.862
+    Solid               out 0.129  in 680.322
+    Gas                 out 0  in 81.144
+    District heating    out 0  in 0.129
+    Coal                out 400  in 11.606
+    Coal reserves       out 11.606  in 0

@@ -1,0 +1,6 @@
+Git graph
+
+               initial     v1.0        hotfix
+  main     ●───●───────────●───◉───────○
+               │           │       hotfix
+  develop      └───●───●───┴───────●

@@ -1,0 +1,8 @@
+zig-out/
+.zig-cache/
+zig-pkg/
+vendor/*
+!vendor/tree-sitter/
+!vendor/grammars/
+vendor/grammars/*
+!vendor/grammars/zig/

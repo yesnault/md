@@ -1,0 +1,28 @@
+C4 Dynamic diagram
+
+  Dynamic diagram for Internet Banking System - API Application
+  
+   ┌─────────────────────┐
+   │   Single-Page App   │
+   ├─────────────────────┤
+   │ <<Container>>       │
+   │ JavaScript, Angular │
+   └─────────────────────┘
+  1. Submits credentials t
+              │
+              ▼
+    ┌──────────────────┐
+    │ API Application  │
+    ├──────────────────┤
+    │ <<Container>>    │
+    │ Java, Spring MVC │
+    └──────────────────┘
+  2. Validates│credentials
+              │
+              ▼
+     ┌─────────────────┐
+     │    Database     │
+     ├─────────────────┤
+     │ <<ContainerDb>> │
+     │ SQL Database    │
+     └─────────────────┘

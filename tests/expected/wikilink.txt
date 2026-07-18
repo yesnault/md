@@ -1,0 +1,10 @@
+Wikilinks
+
+Plain Page link.
+
+Labeled custom label link.
+
+Punctuation-adjacent (a) and Page Name with spaces.
+
+A paragraph long enough to wrap around the eighty column mark where the wrapped
+label sits near the boundary of the rendered line.

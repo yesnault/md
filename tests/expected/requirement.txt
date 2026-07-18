@@ -1,0 +1,32 @@
+Requirement diagram
+
+       ┌──────────────────┐
+       │   test_entity    │
+       ├──────────────────┤
+       │ <<element>>      │
+       │ type: simulation │
+       └──────────────────┘
+             satisfies
+                 │
+                 ▼
+     ┌──────────────────────┐
+     │       test_req       │
+     ├──────────────────────┤
+     │ <<requirement>>      │
+     │ id: 1                │
+     │ text: the test text. │
+     │ risk: high           │
+     │ verifymethod: test   │
+     └──────────────────────┘
+              derives
+                 │
+                 ▼
+   ┌───────────────────────────┐
+   │        feature_req        │
+   ├───────────────────────────┤
+   │ <<functionalRequirement>> │
+   │ id: 1.1                   │
+   │ text: the feature text.   │
+   │ risk: low                 │
+   │ verifymethod: inspection  │
+   └───────────────────────────┘

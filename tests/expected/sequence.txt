@@ -1,0 +1,30 @@
+Sequence diagram
+
+Messages, plus a loop/alt fragment, an activation bar and a note.
+
+    ┌───────┐    ┌─────┐
+    │ Alice │    │ Bob │
+    └───────┘    └─────┘
+        │           │
+        Hello Bob, how are you?
+        ├───────────▶
+        I am good thanks!
+        ◀───────────┤
+        Authenticate│
+        ├───────────▶
+  ┌─loop─every─minute───────────────┐
+  │     │           ┃ refresh token │
+  │     │           ┃──┐            │
+  │     │           ┃◀─┘            │
+  └─────────────────────────────────┘
+  ┌─alt─success─────────────────────┐
+  │     │  token    ┃               │
+  │     ◀───────────┃               │
+  │─failure─────────────────────────│
+  │     │  error    │               │
+  │     ◀───────────┤               │
+  └─────────────────────────────────┘
+   ┌─────────────────────┐
+   │ session established │
+   └─────────────────────┘
+        │           │

@@ -1,0 +1,15 @@
+Treemap
+
+  Disk usage
+  
+  Documents      █████            36 (32%)
+  ├─ Reports     ████             30 (27%)
+  │  ├─ 2023.pdf ██               12 (11%)
+  │  └─ 2024.pdf ███              18 (16%)
+  └─ Notes       █                6 (5%)
+  Media          █████████        64 (57%)
+  ├─ Photos      ██████           40 (36%)
+  └─ Videos      ███              24 (21%)
+  Code           ██               12 (11%)
+  ├─ src         █                9 (8%)
+  └─ vendor      █                3 (3%)

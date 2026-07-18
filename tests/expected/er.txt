@@ -1,0 +1,10 @@
+Entity-relationship diagram
+
+  
+  ┌──────────────┐  places  ┌─────────────────┐ contains
+  │   CUSTOMER   │─────────▶│      ORDER      │─────┐
+  ├──────────────┤          ├─────────────────┤     │    ┌───────────┐
+  │ string name  │          │ int orderNumber │     └───▶│ LINE-ITEM │
+  │ string email │          │ date created    │          └───────────┘
+  │ int id PK    │          └─────────────────┘
+  └──────────────┘

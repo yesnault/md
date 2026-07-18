@@ -1,0 +1,24 @@
+Quadrant chart
+
+  Reach and engagement of campaigns
+                          High Engagement
+  ┌───────────────────────────────┬──────────────────────────────┐
+  │                               │                              │
+  │        Need to promote        │       We should expand       │
+  │                               │                              │
+  │                               │                              │
+  │                               │                              │
+  │                               │   ● Campaign C               │
+  │                  ● Campaign A │                              │
+  ├───────────────────────────────┼──────────────────────────────┤
+  │                               │                              │
+  │                               │                              │
+  │                        ● Campaign E            ● Campaign D  │
+  │                               │                              │
+  │                           ● Campaign B                       │
+  │                               │                              │
+  │          Re-evaluate          │       May be improved        │
+  │                               │                              │
+  └───────────────────────────────┴──────────────────────────────┘
+   Low Reach                                           High Reach
+                           Low Engagement

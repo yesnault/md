@@ -1,0 +1,32 @@
+C4 Component diagram
+
+  Component diagram for Internet Banking System - API Application
+  
+    [2m╭─API Application─────────────────────────────────────────────────────────────────────────────────────────────────────────╮[0m
+    [2m│[0m                    ┌────────────────────────────┐                     ┌─────────────────────────────┐                   [2m│[0m
+    [2m│[0m                    │     Sign In Controller     │                     │ Accounts Summary Controller │                   [2m│[0m
+    [2m│[0m                    ├────────────────────────────┤                     ├─────────────────────────────┤                   [2m│[0m
+    [2m│[0m                    │ <<Component>>              │                     │ <<Component>>               │                   [2m│[0m
+    [2m│[0m                    │ Spring MVC Rest Controller │                     │ Spring MVC Rest Controller  │                   [2m│[0m
+    [2m│[0m                    │ Allows users to sign in.   │                     │ Provides account balances.  │                   [2m│[0m
+    [2m│[0m                    └────────────────────────────┘                     └─────────────────────────────┘                   [2m│[0m
+    [2m│[0m                                 Uses                                               Uses                                 [2m│[0m
+    [2m│[0m                                   │                                                  │                                  [2m│[0m
+    [2m│[0m                                   ▼                                                  ▼                                  [2m│[0m
+    [2m│[0m           ┌───────────────────────────────────────────────┐   ┌─────────────────────────────────────────────┐           [2m│[0m
+    [2m│[0m           │              Security Component               │   │       Mainframe Banking System Facade       │           [2m│[0m
+    [2m│[0m           ├───────────────────────────────────────────────┤   ├─────────────────────────────────────────────┤           [2m│[0m
+    [2m│[0m           │ <<Component>>                                 │   │ <<Component>>                               │           [2m│[0m
+    [2m│[0m           │ Spring Bean                                   │   │ Spring Bean                                 │           [2m│[0m
+    [2m│[0m           │ Provides functionality related to signing in. │   │ A facade onto the mainframe banking system. │           [2m│[0m
+    [2m│[0m           └───────────────────────────────────────────────┘   └─────────────────────────────────────────────┘           [2m│[0m
+    [2m╰───────────────────────────────────┬──────────────────────────────────────────────────┬──────────────────────────────────╯[0m
+                            Reads from and writes to                                     Uses
+                                        ▼                                                  ▼
+                    ┌───────────────────────────────────────┐            ┌──────────────────────────────────┐
+                    │               Database                │            │     Mainframe Banking System     │
+                    ├───────────────────────────────────────┤            ├──────────────────────────────────┤
+                    │ <<ContainerDb>>                       │            │ <<System_Ext>>                   │
+                    │ SQL Database                          │            │ Stores core banking information. │
+                    │ Stores user registration information. │            └──────────────────────────────────┘
+                    └───────────────────────────────────────┘
