@@ -14,6 +14,16 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - name: Verify tag matches build.zig.zon version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          zon="$(sed -n 's/.*\.version = "\([^"]*\)".*/\1/p' build.zig.zon)"
+          if [ "$tag" != "$zon" ]; then
+            echo "::error::tag v$tag != build.zig.zon .version ($zon)"
+            exit 1
+          fi
+          echo "version ok: $zon"
       - uses: mlugg/setup-zig@v2
         with:
           version: 0.16.0
@@ -44,10 +54,9 @@ jobs:
           version: 0.16.0
       - name: build
         run: |
-          version="${GITHUB_REF_NAME#v}"
           date="$(git log -1 --format=%cd --date=short)"
           zig build --release=safe -Dtarget=${{ matrix.target }} \
-            -Dversion="$version" -Drelease-date="$date" -p out
+            -Drelease-date="$date" -p out
       - name: package
         run: |
           version="${GITHUB_REF_NAME#v}"
