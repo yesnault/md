@@ -3,6 +3,7 @@
 const std = @import("std");
 const Io = std.Io;
 
+const build_info = @import("build_info");
 const cli = @import("cli.zig");
 const render = @import("md");
 const options = render.options;
@@ -27,6 +28,7 @@ const usage =
     \\      --goto-line <n>       TUI: open at the section containing source line n
     \\      --find <text>         TUI: open at the first line containing <text>
     \\  -h, --help                show this help
+    \\  -v, --version             show version and release date
     \\
     \\With no file and piped stdin, md reads Markdown from stdin.
     \\To pick a file interactively, compose with fzf:  md "$(fzf)"
@@ -47,6 +49,11 @@ pub fn main(init: std.process.Init) !void {
 
     if (parsed.help) {
         try writeStdout(io, usage);
+        return;
+    }
+
+    if (parsed.version) {
+        try writeStdout(io, "md " ++ build_info.version ++ "\nRelease-Date: " ++ build_info.release_date ++ "\n");
         return;
     }
 

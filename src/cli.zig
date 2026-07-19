@@ -14,6 +14,7 @@ pub const Parsed = struct {
     image: bool = false,
     image_protocol: []const u8 = "auto",
     help: bool = false,
+    version: bool = false,
     opts: Options = .{},
 };
 
@@ -26,6 +27,8 @@ pub fn parse(args: []const [:0]const u8) Error!Parsed {
         const a = args[i];
         if (eql(a, "-h") or eql(a, "--help")) {
             p.help = true;
+        } else if (eql(a, "-v") or eql(a, "--version")) {
+            p.version = true;
         } else if (eql(a, "--no-tui")) {
             p.no_tui = true;
         } else if (eql(a, "--tui")) {
@@ -150,6 +153,12 @@ test "parse: --find captures text" {
     const p2 = try parse(&[_][:0]const u8{"--find=hello"});
     try std.testing.expectEqualStrings("hello", p2.opts.find.?);
     try std.testing.expectError(error.MissingValue, parse(&[_][:0]const u8{"--find"}));
+}
+
+test "parse: -v and --version request the version txt" {
+    try std.testing.expect((try parse(&[_][:0]const u8{"-v"})).version);
+    try std.testing.expect((try parse(&[_][:0]const u8{"--version"})).version);
+    try std.testing.expect(!(try parse(&[_][:0]const u8{"README.md"})).version);
 }
 
 test "parse: unknown enum-like values error instead of degrading silently" {

@@ -41,6 +41,16 @@ pub fn build(b: *std.Build) void {
     exe_mod.addImport("md", md_mod);
     exe_mod.addImport("vaxis", vaxis_mod);
 
+    // Version and release-date injected at build time
+    const version = b.option([]const u8, "version", "Override version string") orelse
+        @import("build.zig.zon").version;
+    const release_date = b.option([]const u8, "release-date", "Release date (YYYY-MM-DD)") orelse
+        "unknown";
+    const build_info = b.addOptions();
+    build_info.addOption([]const u8, "version", version);
+    build_info.addOption([]const u8, "release_date", release_date);
+    exe_mod.addOptions("build_info", build_info);
+
     const exe = b.addExecutable(.{
         .name = "md",
         .root_module = exe_mod,
