@@ -43,7 +43,11 @@ jobs:
         with:
           version: 0.16.0
       - name: build
-        run: zig build --release=safe -Dtarget=${{ matrix.target }} -p out
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          date="$(git log -1 --format=%cd --date=short)"
+          zig build --release=safe -Dtarget=${{ matrix.target }} \
+            -Dversion="$version" -Drelease-date="$date" -p out
       - name: package
         run: |
           version="${GITHUB_REF_NAME#v}"
