@@ -38,31 +38,48 @@ pub const Edge = struct {
 };
 
 const Glyphs = struct {
-    tl: u21,      // top-left     ┌
-    tr: u21,      // top-right    ┐
-    bl: u21,      // bottom-left  └
-    br: u21,      // bottom-right ┘
-    te_l: u21,    // left tee     ├ (compartment divider)
-    te_r: u21,    // right tee    ┤
-    h: u21,       // horizontal   ─
-    v: u21,       // vertical     │
-    a_down: u21,  // arrow down   ▼
-    a_up: u21,    // arrow up     ▲
+    tl: u21, // top-left     ┌
+    tr: u21, // top-right    ┐
+    bl: u21, // bottom-left  └
+    br: u21, // bottom-right ┘
+    te_l: u21, // left tee     ├ (compartment divider)
+    te_r: u21, // right tee    ┤
+    h: u21, // horizontal   ─
+    v: u21, // vertical     │
+    a_down: u21, // arrow down   ▼
+    a_up: u21, // arrow up     ▲
     a_right: u21, // arrow right  ▶
-    a_left: u21,  // arrow left   ◀
+    a_left: u21, // arrow left   ◀
 };
 
 const unicode_glyphs = Glyphs{
-    .tl = '\u{250C}', .tr = '\u{2510}', .bl = '\u{2514}', .br = '\u{2518}', // ┌ ┐ └ ┘
-    .te_l = '\u{251C}', .te_r = '\u{2524}', // ├ ┤
-    .h = '\u{2500}',  .v = '\u{2502}', // ─ │
-    .a_down = '\u{25BC}', .a_up = '\u{25B2}', .a_right = '\u{25B6}', .a_left = '\u{25C0}', // ▼ ▲ ▶ ◀
+    .tl = '\u{250C}',
+    .tr = '\u{2510}',
+    .bl = '\u{2514}',
+    .br = '\u{2518}', // ┌ ┐ └ ┘
+    .te_l = '\u{251C}',
+    .te_r = '\u{2524}', // ├ ┤
+    .h = '\u{2500}',
+    .v = '\u{2502}', // ─ │
+    .a_down = '\u{25BC}',
+    .a_up = '\u{25B2}',
+    .a_right = '\u{25B6}',
+    .a_left = '\u{25C0}', // ▼ ▲ ▶ ◀
 };
 
 const ascii_glyphs = Glyphs{
-    .tl = '+', .tr = '+', .bl = '+', .br = '+', .te_l = '+', .te_r = '+',
-    .h = '-', .v = '|',
-    .a_down = 'v', .a_up = '^', .a_right = '>', .a_left = '<',
+    .tl = '+',
+    .tr = '+',
+    .bl = '+',
+    .br = '+',
+    .te_l = '+',
+    .te_r = '+',
+    .h = '-',
+    .v = '|',
+    .a_down = 'v',
+    .a_up = '^',
+    .a_right = '>',
+    .a_left = '<',
 };
 
 const box_h: usize = 3;

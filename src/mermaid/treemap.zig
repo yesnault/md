@@ -157,8 +157,6 @@ fn fmtNum(arena: std.mem.Allocator, v: f64) []const u8 {
 
 const leadingSpaces = text.leadingSpaces;
 
-
-
 test "treemap aggregates sections and draws bars" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();

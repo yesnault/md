@@ -9,6 +9,14 @@ PREFIX ?= $(HOME)/.local
 
 .PHONY: build install test regen-assets clean
 
+# format locally
+fmt:
+	zig build fmt
+
+# check format on ci
+fmt-check:
+	zig build fmt-check
+
 build:
 	zig build --release=safe
 

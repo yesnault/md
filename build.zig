@@ -8,6 +8,7 @@ pub fn build(b: *std.Build) void {
         "external_vaxis",
         "Consumer supplies the 'vaxis' import on the md module",
     ) orelse false;
+
     const update_expected = b.option(
         bool,
         "update-expected",
@@ -53,6 +54,17 @@ pub fn build(b: *std.Build) void {
     if (b.args) |args| run_cmd.addArgs(args);
     const run_step = b.step("run", "Run md");
     run_step.dependOn(&run_cmd.step);
+
+    // zig build fmt
+    const fmt_paths: []const []const u8 = &.{ "src", "build.zig" };
+    const fmt = b.addFmt(.{ .paths = fmt_paths });
+    const fmt_step = b.step("fmt", "Format");
+    fmt_step.dependOn(&fmt.step);
+
+    // zig build fmt-check
+    const fmt_check = b.addFmt(.{ .paths = fmt_paths, .check = true });
+    const fmt_check_step = b.step("fmt-check", "Check formatting");
+    fmt_check_step.dependOn(&fmt_check.step);
 
     const lib_tests = b.addTest(.{ .root_module = md_mod });
     const run_lib_tests = b.addRunArtifact(lib_tests);
