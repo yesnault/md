@@ -190,9 +190,10 @@ test "c4 context renders elements, stereotypes, relations and title" {
     const art = try render(arena.allocator(), src, true);
     for ([_][]const u8{
         "System Context diagram for Internet Banking", // title
-        "Banking Customer A",                          "Internet Banking System",
-        "Mail System",                                 "A customer of the bank.", // description body
-        "<<System_Ext>>",                              "Uses",
+        "Banking Customer A",
+        "Internet Banking System",
+        "Mail System",    "A customer of the bank.", // description body
+        "<<System_Ext>>", "Uses",
         "Sends e-mails",
     }) |needle| {
         try std.testing.expect(std.mem.indexOf(u8, art, needle) != null);
@@ -212,8 +213,10 @@ test "c4 deployment groups containers in a titled deployment node" {
     const art = try render(arena.allocator(), src, true);
     for ([_][]const u8{
         "Amazon Web Services", // deployment node → titled cluster box
-        "API Application",      "Database",
-        "<<ContainerDb>>",      "Banking API",
+        "API Application",
+        "Database",
+        "<<ContainerDb>>",
+        "Banking API",
     }) |needle| {
         try std.testing.expect(std.mem.indexOf(u8, art, needle) != null);
     }

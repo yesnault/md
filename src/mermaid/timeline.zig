@@ -126,8 +126,6 @@ fn cleanBr(arena: std.mem.Allocator, s: []const u8) ![]const u8 {
     return std.mem.trim(u8, out.items, ws);
 }
 
-
-
 test "timeline renders title, sections and branched events" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
