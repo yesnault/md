@@ -8,6 +8,8 @@ Output goes to a scrollable full-screen pager, or straight to stdout when piped.
 `md` is also consumable as a library: depend on the package and import the `md`
 module (`renderToAnsi`, `theme`, `ansiseg`).
 
+![md demo](demo.gif)
+
 ## Requirements
 
 - **Zig 0.16** to build.
