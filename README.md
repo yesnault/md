@@ -5,7 +5,7 @@ ANSI: headings, lists, tables, code blocks with syntax highlighting, and
 Mermaid diagrams as text art.
 Output goes to a scrollable full-screen pager, or straight to stdout when piped.
 
-`md` is also consumable as a library: depend on the package and import the `md`
+`md` is also consumable as a library (see [example](example/README.md)): depend on the package and import the `md`
 module (`renderToAnsi`, `theme`, `ansiseg`).
 
 ![md demo](demo.gif)
