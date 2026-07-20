@@ -110,6 +110,28 @@ const NavReq = struct {
     push: bool, // push the current document onto the history
 };
 
+/// A mouse text selection, kept in document coordinates so it survives scrolling
+/// and resizes. `moved` distinguishes a drag (a selection to copy) from a plain
+/// click (which follows a link instead).
+const Sel = struct {
+    a_line: usize, // anchor: where the button went down
+    a_col: usize,
+    h_line: usize, // head: the current drag position
+    h_col: usize,
+    moved: bool = false,
+
+    const Point = struct { line: usize, col: usize };
+
+    /// (start, end) ordered so start precedes end in the document.
+    fn normalized(self: Sel) struct { start: Point, end: Point } {
+        const a: Point = .{ .line = self.a_line, .col = self.a_col };
+        const h: Point = .{ .line = self.h_line, .col = self.h_col };
+        const a_first = self.a_line < self.h_line or
+            (self.a_line == self.h_line and self.a_col <= self.h_col);
+        return if (a_first) .{ .start = a, .end = h } else .{ .start = h, .end = a };
+    }
+};
+
 /// The pager's mutable state, shared by the event handlers: the current
 /// document (owned), its rendered form, and the interactive search/link/history
 /// state.
@@ -132,6 +154,10 @@ const Session = struct {
     search: Search = .{},
     /// Static footer message set by followLink, cleared on the next event.
     status: ?[]const u8 = null,
+    /// Mouse text selection (in document coordinates), null when there is none.
+    sel: ?Sel = null,
+    /// True between a left button-down and its release.
+    dragging: bool = false,
 
     fn deinit(self: *Session) void {
         const gpa = self.gpa;
@@ -182,6 +208,7 @@ const Session = struct {
     /// True means quit.
     fn handleKey(self: *Session, key: vaxis.Key) !bool {
         const body_h = self.bodyH();
+        self.sel = null; // any key dismisses the mouse selection highlight
         if (self.search.input) return self.handleSearchKey(key, body_h);
         if (key.matches('c', .{ .ctrl = true }) or
             key.matches('q', .{}) or
@@ -264,22 +291,86 @@ const Session = struct {
     fn handleMouse(self: *Session, mouse: vaxis.Mouse) !void {
         const body_h = self.bodyH();
         if (mouse.button == .wheel_up) {
+            self.sel = null;
             self.pager.scrollBy(-3, body_h);
         } else if (mouse.button == .wheel_down) {
+            self.sel = null;
             self.pager.scrollBy(3, body_h);
         } else if (mouse.type == .press and mouse.button == .left) {
-            if (mouse.row >= 0 and mouse.col >= 0 and @as(usize, @intCast(mouse.row)) < body_h) {
-                const line = self.pager.offset + @as(usize, @intCast(mouse.row));
-                if (self.links.hitTest(line, @intCast(mouse.col))) |gi| {
+            const line = self.pager.offset + clampRow(mouse.row, body_h);
+            const col = clampCol(mouse.col);
+            self.dragging = true;
+            self.sel = .{ .a_line = line, .a_col = col, .h_line = line, .h_col = col };
+        } else if (mouse.type == .drag and self.dragging) {
+            if (self.sel) |*sel| {
+                const line = self.pager.offset + clampRow(mouse.row, body_h);
+                const col = clampCol(mouse.col);
+                if (line != sel.a_line or col != sel.a_col) sel.moved = true;
+                sel.h_line = line;
+                sel.h_col = col;
+            }
+        } else if (mouse.type == .release and self.dragging) {
+            self.dragging = false;
+            const sel = self.sel orelse return;
+            if (!sel.moved) {
+                // A plain click (no drag): follow a link under the release point.
+                self.sel = null;
+                if (self.links.hitTest(sel.a_line, sel.a_col)) |gi| {
                     self.links.selected = gi;
                     if (try self.followLink(gi, body_h)) |req| try self.navigate(req);
                 }
+            } else {
+                // A drag: copy the selected text. Keep sel set so it stays lit.
+                const text = try self.selectedText(sel);
+                defer self.gpa.free(text);
+                if (text.len == 0) return;
+                // here, try copy to system clipboard
+                self.vx.copyToSystemClipboard(self.writer, text, self.gpa) catch {
+                    self.status = "copy failed";
+                    return;
+                };
+                self.status = "copied";
             }
         }
     }
 
+    fn selectedText(self: *Session, sel: Sel) ![]u8 {
+        const win = self.vx.window();
+        const body_h = self.bodyH();
+        const n = sel.normalized();
+        var out: std.ArrayList(u8) = .empty;
+        errdefer out.deinit(self.gpa);
+
+        var line = n.start.line;
+        while (line <= n.end.line) : (line += 1) {
+            if (line < self.pager.offset) continue;
+            const row = line - self.pager.offset;
+            if (row >= body_h) break;
+            const col_start: usize = if (line == n.start.line) n.start.col else 0;
+            // End column is inclusive on the last line. Earlier lines run to the
+            // window edge and shed their trailing blanks below.
+            const col_end: usize = if (line == n.end.line) n.end.col + 1 else win.width;
+
+            const line_start = out.items.len;
+            var col = col_start;
+            while (col < col_end and col < win.width) {
+                const cell = win.readCell(@intCast(col), @intCast(row)) orelse {
+                    col += 1;
+                    continue;
+                };
+                try out.appendSlice(self.gpa, cell.char.grapheme);
+                col += if (cell.char.width > 1) cell.char.width else 1;
+            }
+            while (out.items.len > line_start and out.items[out.items.len - 1] == ' ')
+                _ = out.pop();
+            if (line != n.end.line) try out.append(self.gpa, '\n');
+        }
+        return out.toOwnedSlice(self.gpa);
+    }
+
     fn handleResize(self: *Session, new_ws: vaxis.Winsize) !void {
         const gpa = self.gpa;
+        self.sel = null; // rewrapped lines invalidate the selection's coordinates
         try self.vx.resize(gpa, self.writer, new_ws);
         self.ws = new_ws;
         freeImages(self.vx, self.writer, &self.imgs);
@@ -424,6 +515,29 @@ const Session = struct {
             }
         }
 
+        // Reverse the mouse selection's cells, clipped to the visible body and to
+        // each line's text (never the trailing blanks).
+        if (self.sel) |sel| if (sel.moved) {
+            const n = sel.normalized();
+            var line = n.start.line;
+            while (line <= n.end.line) : (line += 1) {
+                if (line < self.pager.offset) continue;
+                const row = line - self.pager.offset;
+                if (row >= body_h) break;
+                const content_end = lineContentEnd(win, @intCast(row));
+                const col_start: usize = if (line == n.start.line) n.start.col else 0;
+                const want_end: usize = if (line == n.end.line) n.end.col + 1 else content_end;
+                const col_end = @min(want_end, content_end);
+                var col = col_start;
+                while (col < col_end) : (col += 1) {
+                    const c = std.math.cast(u16, col) orelse break;
+                    var cell = win.readCell(c, @intCast(row)) orelse break;
+                    cell.style.reverse = true;
+                    win.writeCell(c, @intCast(row), cell);
+                }
+            }
+        };
+
         // Overlay diagram images over their (text-art) rows when fully visible.
         for (self.imgs.items) |t| {
             if (t.line < self.pager.offset) continue;
@@ -536,6 +650,30 @@ pub fn run(
         try s.draw(frame.allocator());
         try vx.render(writer);
     }
+}
+
+/// Mouse rows outside the text body clamp to it: a drag past the footer or
+/// above the top still yields a valid viewport row.
+fn clampRow(row: i16, body_h: usize) usize {
+    if (row < 0 or body_h == 0) return 0;
+    return @min(@as(usize, @intCast(row)), body_h - 1);
+}
+
+fn clampCol(col: i16) usize {
+    return if (col < 0) 0 else @intCast(col);
+}
+
+/// Exclusive column just past the last non-blank cell on row (0 if blank):
+/// selection highlighting stops at the text instead of painting trailing space.
+fn lineContentEnd(win: vaxis.Window, row: u16) usize {
+    var end: usize = 0;
+    var col: u16 = 0;
+    while (col < win.width) : (col += 1) {
+        const cell = win.readCell(col, row) orelse continue;
+        const blank = cell.char.grapheme.len == 1 and cell.char.grapheme[0] == ' ';
+        if (!blank) end = col + 1;
+    }
+    return end;
 }
 
 /// An off-screen match goes to the top line (like --find and less). One already
@@ -676,6 +814,26 @@ test "splitTarget separates the path from the fragment" {
     const t2 = splitTarget("other.md");
     try std.testing.expectEqualStrings("other.md", t2.path);
     try std.testing.expect(t2.frag == null);
+}
+
+test "Sel.normalized orders endpoints by line then column" {
+    const up = Sel{ .a_line = 5, .a_col = 2, .h_line = 3, .h_col = 9 };
+    const un = up.normalized();
+    try std.testing.expectEqual(@as(usize, 3), un.start.line);
+    try std.testing.expectEqual(@as(usize, 9), un.start.col);
+    try std.testing.expectEqual(@as(usize, 5), un.end.line);
+
+    // Same line, head left of anchor: order by column.
+    const left = Sel{ .a_line = 4, .a_col = 8, .h_line = 4, .h_col = 1 };
+    const ln = left.normalized();
+    try std.testing.expectEqual(@as(usize, 1), ln.start.col);
+    try std.testing.expectEqual(@as(usize, 8), ln.end.col);
+
+    // Forward drag stays as-is.
+    const fwd = Sel{ .a_line = 2, .a_col = 0, .h_line = 2, .h_col = 6 };
+    const fn_ = fwd.normalized();
+    try std.testing.expectEqual(@as(usize, 0), fn_.start.col);
+    try std.testing.expectEqual(@as(usize, 6), fn_.end.col);
 }
 
 test "isMarkdownPath accepts .md/.markdown case-insensitively" {
