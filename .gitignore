@@ -6,3 +6,7 @@ vendor/*
 !vendor/grammars/
 vendor/grammars/*
 !vendor/grammars/zig/
+
+demo.cast
+tools/Dockerfile.demo
+tools/demo.md
