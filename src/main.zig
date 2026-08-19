@@ -5,13 +5,14 @@ const Io = std.Io;
 
 const build_info = @import("build_info");
 const cli = @import("cli.zig");
+const fetch = @import("fetch.zig");
 const render = @import("md");
 const options = render.options;
 const tui = @import("tui/app.zig");
 const wikilink = @import("wikilink.zig");
 
 const usage =
-    \\Usage: md [options] [file|-]
+    \\Usage: md [options] [file|url|-]
     \\
     \\Read Markdown in the terminal, with Mermaid diagrams
     \\
@@ -31,6 +32,7 @@ const usage =
     \\  -v, --version             show version and release date
     \\
     \\With no file and piped stdin, md reads Markdown from stdin.
+    \\An http:// or https:// URL is fetched, and rendered when it is Markdown.
     \\To pick a file interactively, compose with fzf:  md "$(fzf)"
     \\
 ;
@@ -86,11 +88,18 @@ pub fn main(init: std.process.Init) !void {
     const stdout_tty = Io.File.stdout().isTty(io) catch false;
     if (parsed.tui or stdout_tty) {
         if (path == null) noInput(io);
-        const data = Io.Dir.cwd().readFileAlloc(io, path.?, arena, .unlimited) catch |err|
-            fail(io, "md: cannot read {s}: {s}\n", .{ path.?, @errorName(err) });
+        // A redirect moves the document. The TUI resolves relative links
+        // against where it landed.
+        var loc = path.?;
+        const data = if (fetch.isUrl(loc)) blk: {
+            const doc = fetchOrFail(io, arena, loc);
+            loc = doc.url;
+            break :blk doc.body;
+        } else Io.Dir.cwd().readFileAlloc(io, loc, arena, .unlimited) catch |err|
+            fail(io, "md: cannot read {s}: {s}\n", .{ loc, @errorName(err) });
         // The TUI re-renders on every resize and frees the previous content
         // it needs a real allocator (the process arena never reclaims).
-        tui.run(io, std.heap.c_allocator, &env_map, path.?, data, parsed.opts) catch |err|
+        tui.run(io, std.heap.c_allocator, &env_map, loc, data, parsed.opts) catch |err|
             fail(io, "md: tui error: {s}\n", .{@errorName(err)});
         return;
     }
@@ -111,12 +120,14 @@ fn runCli(io: Io, arena: std.mem.Allocator, path: ?[]const u8, opts: options.Opt
     };
     var o = opts;
     var wl: wikilink.Resolver = .{ .io = io, .dir = "" };
-    // Wikilink targets resolve against the document's own directory. stdin has none,
-    // so its targets stay unchecked: a cwd has nothing to do with where the Markdown
-    // came from.
+    // Wikilink targets resolve against the document's own directory. stdin and a
+    // URL have none, and a cwd has nothing to do with where the Markdown came
+    // from: their targets stay unchecked.
     if (o.wikilinks) if (path) |p| {
-        wl.dir = std.fs.path.dirname(p) orelse ".";
-        o.wikilink_check = wl.check();
+        if (!fetch.isUrl(p)) {
+            wl.dir = std.fs.path.dirname(p) orelse ".";
+            o.wikilink_check = wl.check();
+        }
     };
     const out = render.renderToAnsi(arena, data, o) catch |err|
         fail(io, "md: render failed: {s}\n", .{@errorName(err)});
@@ -147,9 +158,34 @@ fn fail(io: Io, comptime fmt: []const u8, args: anytype) noreturn {
     std.process.exit(1);
 }
 
-/// From a file, or from stdin when `path` is null or "-". NoInput when stdin would
-/// be an interactive tty.
+/// Exits with a message unless the response is 2xx and carries real Markdown.
+/// A web page or a binary would land straight in the terminal.
+fn fetchOrFail(io: Io, alloc: std.mem.Allocator, url: []const u8) fetch.Doc {
+    const res = fetch.get(io, alloc, url) catch |err|
+        fail(io, "md: cannot fetch {s}: {s}\n", .{ url, @errorName(err) });
+    return switch (res) {
+        .ok => |doc| doc,
+        .bad_status => |st| fail(io, "md: {s}: HTTP {d} {s}\n", .{
+            url,
+            @intFromEnum(st),
+            st.phrase() orelse "",
+        }),
+        .not_markdown => |ct| if (ct.len == 0)
+            fail(io, "md: {s}: not Markdown (no content-type)\n", .{url})
+        else
+            fail(io, "md: {s}: not Markdown (content-type: {s})\n", .{ url, ct }),
+        .insecure_redirect => |final| fail(
+            io,
+            "md: {s}: redirected from https to http ({s})\n",
+            .{ url, final },
+        ),
+    };
+}
+
+/// From a URL, from a file, or from stdin when path is null or "-". NoInput when
+/// stdin would be an interactive tty.
 fn readInput(io: Io, alloc: std.mem.Allocator, path: ?[]const u8) ![]u8 {
+    if (path) |p| if (fetch.isUrl(p)) return fetchOrFail(io, alloc, p).body;
     const from_stdin = path == null or std.mem.eql(u8, path.?, "-");
     if (from_stdin) {
         if (try Io.File.stdin().isTty(io)) return error.NoInput;
@@ -178,6 +214,7 @@ fn printErr(io: Io, comptime fmt: []const u8, args: anytype) !void {
 
 test {
     _ = @import("cli.zig");
+    _ = @import("fetch.zig");
     _ = @import("wikilink.zig");
     _ = @import("tui/app.zig");
     _ = @import("tui/pager.zig");

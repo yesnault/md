@@ -31,6 +31,7 @@ md README.md            # open in the scrollable pager
 md --no-tui README.md   # render once to stdout (ANSI), e.g. piped to a pager
 cat README.md | md      # read Markdown from stdin
 md - < README.md        # same, explicit stdin
+md https://host/doc.md  # fetch over http(s), if the response is Markdown
 ```
 
 ### Options
@@ -62,8 +63,8 @@ PgUp/PgDn          scroll one page  (Space = page down)
 g / G              jump to top / bottom
 Tab / Shift+Tab    select the next / previous link
 Enter              follow the selected link
-                   (#anchor jumps in-doc, .md opens the file,
-                    URLs open externally)
+                   (#anchor jumps in-doc, .md opens the file or URL,
+                    absolute URLs open externally)
 Backspace          go back to the previous document
 /                  search: matches highlight as you type
                    (Enter keeps them, Esc cancels and goes back)

@@ -12,6 +12,7 @@ const options = render.options;
 const ansiseg = render.ansiseg;
 const Pager = @import("pager.zig").Pager;
 const Search = @import("search.zig").Search;
+const fetch = @import("../fetch.zig");
 const wikilink = @import("../wikilink.zig");
 
 /// A diagram image placed over text rows in the pager.
@@ -100,11 +101,12 @@ const Links = struct {
     }
 };
 
-/// A document the user can go back to with Backspace.
+/// A document the user can go back to with Backspace. path locates it: a file
+/// path, or an http(s) URL.
 const Hist = struct { path: []u8, offset: usize };
 
 const NavReq = struct {
-    path: []u8, // gpa-owned filesystem path to open
+    path: []u8, // gpa-owned file path or http(s) URL to open
     frag: ?[]u8, // gpa-owned #fragment to jump to after loading
     ret_offset: ?usize, // back navigation: restore this offset instead
     push: bool, // push the current document onto the history
@@ -144,8 +146,8 @@ const Session = struct {
     ws: vaxis.Winsize,
     imgs: std.ArrayList(TuiImg) = .empty,
     links: Links = .{},
-    // Current document (owned): file navigation replaces these, Backspace
-    // walks the history back.
+    // Current document (owned): navigation replaces these, Backspace walks the
+    // history back. doc_path locates the document: a file path, or an http(s) URL.
     doc: []u8 = &.{},
     doc_path: []u8 = &.{},
     history: std.ArrayList(Hist) = .empty,
@@ -418,14 +420,52 @@ const Session = struct {
         return null;
     }
 
-    /// Loads `req.path` and swaps it in as the current document. A file that
-    /// cannot be read only sets the footer message.
+    /// Reads the document at loc.*, over HTTP(S) when it is a URL. On success
+    /// loc.* becomes the location it came from and the requested one is freed.
+    /// Null on failure, with the footer message set.
+    fn loadDoc(self: *Session, loc: *[]u8) ?[]u8 {
+        const gpa = self.gpa;
+        if (!fetch.isUrl(loc.*)) return Io.Dir.cwd().readFileAlloc(self.io, loc.*, gpa, .unlimited) catch {
+            self.status = "cannot open file";
+            return null;
+        };
+        const res = fetch.get(self.io, gpa, loc.*) catch {
+            self.status = "cannot fetch";
+            return null;
+        };
+        switch (res) {
+            .ok => |doc| {
+                gpa.free(loc.*);
+                loc.* = doc.url;
+                return doc.body;
+            },
+            .not_markdown => |ct| {
+                gpa.free(ct);
+                self.status = "not Markdown";
+                return null;
+            },
+            .insecure_redirect => |final| {
+                gpa.free(final);
+                self.status = "insecure redirect (https to http)";
+                return null;
+            },
+            .bad_status => {
+                self.status = "cannot fetch";
+                return null;
+            },
+        }
+    }
+
+    /// Loads req.path and swaps it in as the current document. A document that
+    /// cannot be loaded only sets the footer message.
     fn navigate(self: *Session, req: NavReq) !void {
         const gpa = self.gpa;
-        const new_doc = Io.Dir.cwd().readFileAlloc(self.io, req.path, gpa, .unlimited) catch {
-            gpa.free(req.path);
+        // loadDoc may hand back a different location than the one requested.
+        // The next relative link resolves against that one.
+        var path = req.path;
+        const new_doc = self.loadDoc(&path) orelse {
+            gpa.free(path);
             if (req.frag) |f| gpa.free(f);
-            self.status = "cannot open file";
             return;
         };
         errdefer gpa.free(new_doc);
@@ -433,9 +473,9 @@ const Session = struct {
         try self.history.ensureUnusedCapacity(gpa, 1);
         freeImages(self.vx, self.writer, &self.imgs);
         self.links.reset(gpa);
-        // req.path, not doc_path: doc_path still names the outgoing document
-        // until the commit point below.
-        const new_content = try loadContent(self.io, gpa, self.vx, self.writer, req.path, new_doc, self.opts, self.ws.cols, &self.imgs, &self.links);
+        // path, not doc_path: doc_path still names the outgoing document until
+        // the commit point below.
+        const new_content = try loadContent(self.io, gpa, self.vx, self.writer, path, new_doc, self.opts, self.ws.cols, &self.imgs, &self.links);
         errdefer gpa.free(new_content);
         const new_pager = try Pager.init(gpa, new_content);
         // Commit point: nothing below can fail. Hand the outgoing document to
@@ -445,7 +485,7 @@ const Session = struct {
         } else {
             gpa.free(self.doc_path);
         }
-        self.doc_path = req.path;
+        self.doc_path = path;
         gpa.free(self.doc);
         self.doc = new_doc;
         gpa.free(self.content);
@@ -719,7 +759,9 @@ fn isMarkdownPath(p: []const u8) bool {
 }
 
 /// Resolves against the current file's directory. Absolute targets are kept as-is.
+/// A document fetched over HTTP has no directory: its targets follow its origin.
 fn resolveFileTarget(gpa: std.mem.Allocator, doc_path: []const u8, target: SplitTarget) !NavReq {
+    if (fetch.isUrl(doc_path)) return resolveUrlTarget(gpa, doc_path, target);
     const raw = try gpa.dupe(u8, target.path);
     defer gpa.free(raw);
     const decoded = std.Uri.percentDecodeInPlace(raw);
@@ -732,6 +774,23 @@ fn resolveFileTarget(gpa: std.mem.Allocator, doc_path: []const u8, target: Split
     errdefer gpa.free(new_path);
     const frag: ?[]u8 = if (target.frag) |f| try gpa.dupe(u8, f) else null;
     return .{ .path = new_path, .frag = frag, .ret_offset = null, .push = true };
+}
+
+/// Resolves a scheme-less target against the URL the document came from, per
+/// RFC 3986: "other.md", "../a/b.md" and "/x/y.md" all stay on that server.
+fn resolveUrlTarget(gpa: std.mem.Allocator, doc_url: []const u8, target: SplitTarget) !NavReq {
+    const base = try std.Uri.parse(doc_url);
+    // resolveInPlace reads the target from the head of the buffer, then builds the
+    // merged path right after it: room for both.
+    const buf = try gpa.alloc(u8, target.path.len * 2 + doc_url.len + 1);
+    defer gpa.free(buf);
+    @memcpy(buf[0..target.path.len], target.path);
+    var aux: []u8 = buf;
+    const uri = try base.resolveInPlace(target.path.len, &aux);
+    const new_url = try std.fmt.allocPrint(gpa, "{f}", .{&uri});
+    errdefer gpa.free(new_url);
+    const frag: ?[]u8 = if (target.frag) |f| try gpa.dupe(u8, f) else null;
+    return .{ .path = new_url, .frag = frag, .ret_offset = null, .push = true };
 }
 
 /// Hands `url` to xdg-open, detached from the TUI: a transient sh backgrounds it
@@ -777,7 +836,8 @@ fn loadContent(
     // Declared in this frame, not inside the `if`: o.wikilink_check borrows it
     // and it has to stay alive through the render call below.
     var wl: wikilink.Resolver = .{ .io = io, .dir = std.fs.path.dirname(doc_path) orelse "." };
-    if (o.wikilinks) o.wikilink_check = wl.check();
+    // No directory to resolve against: every wikilink would come back broken.
+    if (o.wikilinks and !fetch.isUrl(doc_path)) o.wikilink_check = wl.check();
 
     var places: std.ArrayList(render.Placement) = .empty;
     defer places.deinit(gpa);
@@ -814,6 +874,33 @@ test "splitTarget separates the path from the fragment" {
     const t2 = splitTarget("other.md");
     try std.testing.expectEqualStrings("other.md", t2.path);
     try std.testing.expect(t2.frag == null);
+}
+
+test "a document fetched over HTTP keeps its links on that server" {
+    const gpa = std.testing.allocator;
+    const base = "http://host/docs/foo.md";
+    // Every shape of scheme-less target has to stay remote.
+    const cases = [_]struct { target: []const u8, want: []const u8 }{
+        .{ .target = "other.md", .want = "http://host/docs/other.md" },
+        .{ .target = "../a/b.md", .want = "http://host/a/b.md" },
+        .{ .target = "/x/y.md", .want = "http://host/x/y.md" },
+        .{ .target = "sub/deep.md", .want = "http://host/docs/sub/deep.md" },
+    };
+    for (cases) |c| {
+        const req = try resolveFileTarget(gpa, base, splitTarget(c.target));
+        defer gpa.free(req.path);
+        try std.testing.expectEqualStrings(c.want, req.path);
+        try std.testing.expect(req.frag == null);
+    }
+}
+
+test "a fragment survives resolution against a URL" {
+    const gpa = std.testing.allocator;
+    const req = try resolveFileTarget(gpa, "http://host/docs/foo.md", splitTarget("other.md#intro"));
+    defer gpa.free(req.path);
+    defer gpa.free(req.frag.?);
+    try std.testing.expectEqualStrings("http://host/docs/other.md", req.path);
+    try std.testing.expectEqualStrings("intro", req.frag.?);
 }
 
 test "Sel.normalized orders endpoints by line then column" {
